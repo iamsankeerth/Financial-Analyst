@@ -1,0 +1,31 @@
+# Financial Analyst MCP - Python Backend
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.env
+.env.local
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Redis data
+redis/dump.rdb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
