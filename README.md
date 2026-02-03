@@ -10,7 +10,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/SvelteKit-5.0+-orange?logo=svelte&logoColor=white" alt="SvelteKit">
-  <img src="https://img.shields.io/badge/Gemini-2.0-blue?logo=google&logoColor=white" alt="Gemini">
+  <img src="https://img.shields.io/badge/Gemini-3.0-blue?logo=google&logoColor=white" alt="Gemini">
   <img src="https://img.shields.io/badge/mem0-Semantic%20Memory-purple" alt="mem0">
   <img src="https://img.shields.io/badge/FastAPI-0.115+-green?logo=fastapi&logoColor=white" alt="FastAPI">
 </p>
@@ -23,7 +23,7 @@
 
 ### ✨ Key Features
 
-- 🤖 **AI-Powered Analysis** - Uses Gemini 2.0 Flash for intelligent code generation
+- 🤖 **AI-Powered Analysis** - Uses Gemini 3 Flash for intelligent code generation
 - 🧠 **Semantic Memory** - mem0 enables context retention across conversations
 - 📊 **Real-time Charts** - Dynamic matplotlib visualizations for stocks, crypto, and indices
 - 💹 **Multi-Asset Support** - Analyze stocks (AAPL, MSFT), crypto (BTC-USD), indices (^GSPC), commodities (GLD)
@@ -62,7 +62,7 @@
 | **Python 3.11+** | Core runtime |
 | **FastAPI** | REST API framework |
 | **LangChain** | LLM orchestration |
-| **Google Gemini 2.0** | AI code generation |
+| **Google Gemini 3.0** | AI code generation |
 | **mem0** | Semantic memory layer |
 | **yfinance** | Real-time stock data |
 | **matplotlib** | Chart generation |

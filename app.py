@@ -4,8 +4,91 @@ import matplotlib
 matplotlib.use('Agg')
 import sys
 import io
-from finance_crew import run_financial_analysis
+import re
+from finance_crew import run_financial_analysis, GEMINI_MODEL
 from chat_manager import get_manager, get_or_create_chat, set_current_chat, get_current_history, REDIS_AVAILABLE
+
+
+def _style_figure_for_light_background(fig):
+    fig.patch.set_facecolor("white")
+    for ax in fig.get_axes():
+        ax.set_facecolor("white")
+        ax.tick_params(colors="black")
+        ax.xaxis.label.set_color("black")
+        ax.yaxis.label.set_color("black")
+        ax.title.set_color("black")
+        legend = ax.get_legend()
+        if legend:
+            frame = legend.get_frame()
+            frame.set_facecolor("white")
+            frame.set_edgecolor("black")
+            for text in legend.get_texts():
+                text.set_color("black")
+
+
+class _YFWrapper:
+    def __init__(self, yf_module):
+        self._yf = yf_module
+        self.downloads = {}
+
+    def download(self, ticker, *args, **kwargs):
+        df = self._yf.download(ticker, *args, **kwargs)
+        self.downloads[str(ticker)] = df
+        return df
+
+    def Ticker(self, ticker):
+        return self._yf.Ticker(ticker)
+
+    def __getattr__(self, name):
+        return getattr(self._yf, name)
+
+
+def _soften_causality(text: str) -> str:
+    if not text:
+        return text
+    replacements = [
+        (r"\bis often tied to\b", "may be tied to"),
+        (r"\bis driven by\b", "may be driven by"),
+        (r"\bis caused by\b", "may be influenced by"),
+        (r"\bis due to\b", "may be due to"),
+        (r"\bleads to\b", "can lead to"),
+        (r"\bresults in\b", "can result in"),
+    ]
+    softened = text
+    for pattern, repl in replacements:
+        softened = re.sub(pattern, repl, softened, flags=re.IGNORECASE)
+    return softened
+
+
+def _build_validation_output(yf_wrapper) -> str:
+    downloads = getattr(yf_wrapper, "downloads", {}) or {}
+    if not downloads:
+        return ""
+
+    lines = []
+    common_index = None
+    for ticker, df in downloads.items():
+        try:
+            if df is None or getattr(df, "empty", True):
+                lines.append(f"No data returned for {ticker}. Please verify the ticker.")
+                continue
+            latest = df.index.max()
+            latest_date = latest.date() if hasattr(latest, "date") else latest
+            lines.append(f"Latest data date used for {ticker}: {latest_date}")
+
+            if common_index is None:
+                common_index = df.index
+            else:
+                common_index = common_index.intersection(df.index)
+        except Exception:
+            continue
+
+    if common_index is not None and len(common_index) > 0:
+        latest_common = common_index.max()
+        latest_common_date = latest_common.date() if hasattr(latest_common, "date") else latest_common
+        lines.append(f"Latest common date used for comparison: {latest_common_date}")
+
+    return "Validation:\n" + "\n".join(lines) if lines else ""
 
 # Page config
 st.set_page_config(
@@ -293,11 +376,11 @@ with st.sidebar:
     st.divider()
     
     # Info section
-    st.markdown("""
+    st.markdown(f"""
     <div class="info-section">
         <div class="info-title">ℹ️ About</div>
         <div class="info-text">
-            <strong>Model:</strong> Gemini 2.0 Flash<br>
+            <strong>Model:</strong> {GEMINI_MODEL}<br>
             <strong>Data:</strong> Yahoo Finance<br>
             <strong>Features:</strong><br>
             • Multi-chat with memory<br>
@@ -379,18 +462,28 @@ if send_btn and query:
             old_stdout, old_stderr = sys.stdout, sys.stderr
             sys.stdout, sys.stderr = io.StringIO(), io.StringIO()
             
+            yf_wrapper = _YFWrapper(__import__("yfinance"))
             exec(code_mod, {
-                "plt": plt, "yf": __import__("yfinance"),
+                "plt": plt, "yf": yf_wrapper,
                 "pd": __import__("pandas"), "np": __import__("numpy"),
                 "datetime": __import__("datetime")
             })
-            
+
+            output = sys.stdout.getvalue()
             sys.stdout, sys.stderr = old_stdout, old_stderr
+            validation_output = _build_validation_output(yf_wrapper)
+            if validation_output:
+                output = (output.strip() + "\n" if output.strip() else "") + validation_output
+            output = _soften_causality(output)
+            
+            if output.strip():
+                code = f"{code}\n\n# Output:\n# " + output.strip().replace("\n", "\n# ")
             
             fig = plt.gcf()
             if fig.get_axes():
                 buf = io.BytesIO()
-                fig.savefig(buf, format='png', dpi=100, bbox_inches='tight', facecolor='#1a1a2e')
+                _style_figure_for_light_background(fig)
+                fig.savefig(buf, format='png', dpi=100, bbox_inches='tight', facecolor='white', edgecolor='white')
                 buf.seek(0)
                 import base64
                 chart_base64 = base64.b64encode(buf.read()).decode()
@@ -414,8 +507,8 @@ if send_btn and query:
         st.rerun()
 
 # Footer
-st.markdown("""
+st.markdown(f"""
 <div style="text-align: center; color: #a0a0b0; font-size: 0.75rem; margin-top: 1rem;">
-    Gemini 2.0 Flash • Web search enabled
+    {GEMINI_MODEL} • Web search enabled
 </div>
 """, unsafe_allow_html=True)

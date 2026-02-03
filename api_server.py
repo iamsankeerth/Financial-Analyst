@@ -6,6 +6,7 @@ import os
 import sys
 import io
 import base64
+import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,12 +19,94 @@ import matplotlib.pyplot as plt
 from finance_crew import run_financial_analysis, get_memories, clear_memory
 
 
+def _style_figure_for_light_background(fig):
+    fig.patch.set_facecolor("white")
+    for ax in fig.get_axes():
+        ax.set_facecolor("white")
+        ax.tick_params(colors="black")
+        ax.xaxis.label.set_color("black")
+        ax.yaxis.label.set_color("black")
+        ax.title.set_color("black")
+        legend = ax.get_legend()
+        if legend:
+            frame = legend.get_frame()
+            frame.set_facecolor("white")
+            frame.set_edgecolor("black")
+            for text in legend.get_texts():
+                text.set_color("black")
+
+
+class _YFWrapper:
+    def __init__(self, yf_module):
+        self._yf = yf_module
+        self.downloads = {}
+
+    def download(self, ticker, *args, **kwargs):
+        df = self._yf.download(ticker, *args, **kwargs)
+        self.downloads[str(ticker)] = df
+        return df
+
+    def Ticker(self, ticker):
+        return self._yf.Ticker(ticker)
+
+    def __getattr__(self, name):
+        return getattr(self._yf, name)
+
+
+def _soften_causality(text: str) -> str:
+    if not text:
+        return text
+    replacements = [
+        (r"\bis often tied to\b", "may be tied to"),
+        (r"\bis driven by\b", "may be driven by"),
+        (r"\bis caused by\b", "may be influenced by"),
+        (r"\bis due to\b", "may be due to"),
+        (r"\bleads to\b", "can lead to"),
+        (r"\bresults in\b", "can result in"),
+    ]
+    softened = text
+    for pattern, repl in replacements:
+        softened = re.sub(pattern, repl, softened, flags=re.IGNORECASE)
+    return softened
+
+
+def _build_validation_output(yf_wrapper) -> str:
+    downloads = getattr(yf_wrapper, "downloads", {}) or {}
+    if not downloads:
+        return ""
+
+    lines = []
+    common_index = None
+    for ticker, df in downloads.items():
+        try:
+            if df is None or getattr(df, "empty", True):
+                lines.append(f"No data returned for {ticker}. Please verify the ticker.")
+                continue
+            latest = df.index.max()
+            latest_date = latest.date() if hasattr(latest, "date") else latest
+            lines.append(f"Latest data date used for {ticker}: {latest_date}")
+
+            if common_index is None:
+                common_index = df.index
+            else:
+                common_index = common_index.intersection(df.index)
+        except Exception:
+            continue
+
+    if common_index is not None and len(common_index) > 0:
+        latest_common = common_index.max()
+        latest_common_date = latest_common.date() if hasattr(latest_common, "date") else latest_common
+        lines.append(f"Latest common date used for comparison: {latest_common_date}")
+
+    return "Validation:\n" + "\n".join(lines) if lines else ""
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Financial Analyst API Starting...")
-    print("🧠 Using mem0 for semantic memory")
+    print("Financial Analyst API starting...")
+    print("Using mem0 for semantic memory")
     yield
-    print("👋 Shutting down...")
+    print("Shutting down...")
 
 
 app = FastAPI(
@@ -89,9 +172,10 @@ def analyze(request: AnalyzeRequest):
         sys.stdout = io.StringIO()
         sys.stderr = io.StringIO()
         
+        yf_wrapper = _YFWrapper(__import__("yfinance"))
         exec(code_modified, {
             "plt": plt,
-            "yf": __import__("yfinance"),
+            "yf": yf_wrapper,
             "pd": __import__("pandas"),
             "np": __import__("numpy"),
             "datetime": __import__("datetime"),
@@ -100,9 +184,15 @@ def analyze(request: AnalyzeRequest):
         # Get captured output
         output = sys.stdout.getvalue()
         errors = sys.stderr.getvalue()
-        
+
         sys.stdout = old_stdout
         sys.stderr = old_stderr
+
+        validation_output = _build_validation_output(yf_wrapper)
+        if validation_output:
+            output = (output.strip() + "\n" if output.strip() else "") + validation_output
+
+        output = _soften_causality(output)
         
         # If there was printed output, append it as a comment to the code
         if output.strip():
@@ -112,7 +202,8 @@ def analyze(request: AnalyzeRequest):
         fig = plt.gcf()
         if fig.get_axes():
             buf = io.BytesIO()
-            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight', facecolor='#1a1a2e')
+            _style_figure_for_light_background(fig)
+            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight', facecolor='white', edgecolor='white')
             buf.seek(0)
             chart_base64 = base64.b64encode(buf.read()).decode('utf-8')
         plt.close('all')

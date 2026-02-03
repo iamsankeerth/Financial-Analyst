@@ -12,9 +12,13 @@ GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("Please set GOOGLE_API_KEY or GEMINI_API_KEY environment variable")
 
+# Model selection (override via env vars)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MEMORY_MODEL = os.getenv("GEMINI_MEMORY_MODEL", "gemini-2.0-flash-001")
+
 # Initialize Gemini LLM
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model=GEMINI_MODEL,
     google_api_key=GEMINI_API_KEY,
     temperature=0.7,
 )
@@ -25,7 +29,7 @@ mem0_config = {
     "llm": {
         "provider": "gemini",
         "config": {
-            "model": "gemini-2.0-flash-001",
+            "model": GEMINI_MEMORY_MODEL,
             "api_key": GEMINI_API_KEY,
             "temperature": 0.2,
             "max_tokens": 2000,
@@ -51,9 +55,9 @@ mem0_config = {
 
 try:
     memory = Memory.from_config(mem0_config)
-    print("✅ mem0 initialized with Gemini backend (768-dim embeddings)")
+    print("mem0 initialized with Gemini backend (768-dim embeddings)")
 except Exception as e:
-    print(f"⚠️ mem0 initialization failed: {e}, using fallback mode")
+    print(f"mem0 initialization failed: {e}, using fallback mode")
     memory = None
 
 
@@ -107,6 +111,21 @@ MANDATORY SCALAR CASTING: whenever you print a numeric value use float() so f-st
 EMPTY DATA FALLBACK: If yf.download returns empty, fetch recent history:
   hist = yf.Ticker(ticker).history(period="7d", auto_adjust=False)
 
+TICKER VALIDATION & DATE LOGGING:
+- After fallback, if data is still empty, print a clear message: "No data returned for {ticker}. Please verify the ticker."
+  Then stop without plotting.
+- Always compute latest_date = data.index[-1].date() and print:
+  "Latest data date used for {ticker}: {latest_date}"
+- For multi-ticker comparisons, print the latest date for each ticker, and if using combined data,
+  mention the latest common date used.
+
+CHART LABELS:
+- Use neutral labels like "Price" or asset-specific labels ("Metal Price", "Commodity/Futures Price", "Crypto Price").
+- Avoid the phrase "Stock Chart" for metals/commodities/crypto.
+
+CAUSAL LANGUAGE:
+- When explaining reasons, use tentative language (may/could/likely/possible drivers) and avoid definitive causal claims.
+
 PRINT RULE: All print statements must be conversational and use float() around numbers.
 
 SCRIPT STRUCTURE REQUIREMENT:
@@ -140,9 +159,9 @@ def run_financial_analysis(query: str, user_id: str = "default_user") -> str:
                 memories_list = relevant_memories.get("results", []) if isinstance(relevant_memories, dict) else relevant_memories
                 if memories_list:
                     context_str = "\n".join(f"- {m.get('memory', m)}" for m in memories_list if m)
-                    print(f"📚 Retrieved {len(memories_list)} relevant memories")
+                    print(f"Retrieved {len(memories_list)} relevant memories")
             except Exception as mem_err:
-                print(f"⚠️ Memory search failed: {mem_err}")
+                print(f"Memory search failed: {mem_err}")
         
         # 2. Build the prompt with context
         context_section = f"\n\nPrevious Context (use this to understand what the user is referring to):\n{context_str}" if context_str else ""
@@ -204,9 +223,9 @@ def run_financial_analysis(query: str, user_id: str = "default_user") -> str:
                     ],
                     user_id=user_id
                 )
-                print(f"💾 Saved memory for query: {query[:50]}...")
+                print(f"Saved memory for query: {query[:50]}...")
             except Exception as mem_err:
-                print(f"⚠️ Memory save failed: {mem_err}")
+                print(f"Memory save failed: {mem_err}")
         
         return final_code if final_code else "No response generated. Please try again."
         
@@ -219,9 +238,9 @@ def clear_memory(user_id: str = "default_user"):
     if memory:
         try:
             memory.delete_all(user_id=user_id)
-            print(f"🗑️ Cleared all memories for user: {user_id}")
+            print(f"Cleared all memories for user: {user_id}")
         except Exception as e:
-            print(f"⚠️ Failed to clear memory: {e}")
+            print(f"Failed to clear memory: {e}")
 
 
 def get_memories(user_id: str = "default_user"):
@@ -231,7 +250,7 @@ def get_memories(user_id: str = "default_user"):
             all_memories = memory.get_all(user_id=user_id)
             return all_memories
         except Exception as e:
-            print(f"⚠️ Failed to get memories: {e}")
+            print(f"Failed to get memories: {e}")
             return []
     return []
 
@@ -251,4 +270,4 @@ if __name__ == "__main__":
     result = run_financial_analysis("Explain the correlation")
     print(result[:300] + "..." if len(result) > 300 else result)
     
-    print("\n✅ mem0 integration test complete!")
+    print("\nmem0 integration test complete!")

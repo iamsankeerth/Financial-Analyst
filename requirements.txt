@@ -1,9 +1,17 @@
 crewai>=0.121.0
 crewai-tools>=0.45.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
 matplotlib>=3.10.0
 mcp[cli]>=1.9.0
+mem0ai
+langchain-core
+langchain-google-genai
+numpy>=1.26.0
 pandas>=2.2.0
 pydantic>=2.11.0
+qdrant-client
+redis>=5.0.0
 yfinance>=0.2.60
 streamlit>=1.40.0
 python-dotenv>=1.0.0
