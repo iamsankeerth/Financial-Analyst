@@ -131,7 +131,7 @@ export const POST: RequestHandler = async ({ request }) => {
             markdownContent += '\n\n**Analysis Output:**\n```text\n' + printedOutput + '\n```';
         }
         if (result.chart_base64) {
-            markdownContent += `\n\n![Stock Chart](data:image/png;base64,${result.chart_base64})`;
+            markdownContent += `\n\n![Price Chart](data:image/png;base64,${result.chart_base64})`;
         }
 
         // Build HTML content for optimized rendering
@@ -150,7 +150,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
         if (result.chart_base64) {
             htmlContent += `<div class="chart-container mt-4">
-                <img src="data:image/png;base64,${result.chart_base64}" alt="Stock Chart" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
+                <img src="data:image/png;base64,${result.chart_base64}" alt="Price Chart" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
             </div>`;
         }
         htmlContent += `</div>`;
