@@ -9,7 +9,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import { ImageModal } from '$lib/components/ui/image-modal';
 	import { LightSwitch } from '$lib/components/ui/light-switch/index.js';
-	import { ShareButton } from '$lib/components/ui/share-button';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import Tooltip from '$lib/components/ui/tooltip.svelte';
 	import { cmdOrCtrl } from '$lib/hooks/is-mac.svelte.js';
@@ -107,41 +106,52 @@
 
 		error = null;
 
-		// relaxed check for dev
-		const userId = session.current?.user.id ?? 'test-user';
 		const sessionToken = session.current?.session.token ?? 'test-token';
-		const modelId = settings.modelId ?? 'google/gemini-2.5-flash';
 
 		if (message.current === '') return;
 
 		loading = true;
 
+		const currentQuery = message.current;
 		const imagesCopy = [...selectedImages];
 		selectedImages = [];
+		message.current = ''; // Clear early for UX
 
 		try {
-			// Using our custom stock analysis endpoint which connects to the Python backend
+			let cid = page.params.id;
+			let isNewChat = !cid;
+
+			// If it's a new chat, create it locally first for instant redirect
+			if (isNewChat) {
+				const convResult = await client.mutation(api.conversations.createAndAddMessage, {
+					content: currentQuery,
+					role: 'user',
+					session_token: sessionToken,
+					images: imagesCopy,
+				});
+				cid = convResult.conversationId;
+				
+				// Redirect immediately while backend thinks
+				goto(`/chat/${cid}`);
+			}
+
+			// Call the analysis API
+			// We pass skip_user_message: true if we just created the message above
 			const res = await callStockAnalyze({
-				message: message.current,
+				message: currentQuery,
 				session_token: sessionToken,
-				conversation_id: page.params.id ?? undefined,
+				conversation_id: cid,
+				skip_user_message: isNewChat 
 			});
 
 			if (res.isErr()) {
 				error = res.error ?? 'An unknown error occurred';
 				return;
 			}
-
-			const cid = res.value.conversation_id;
-
-			if (page.params.id !== cid) {
-				goto(`/chat/${cid}`);
-			}
 		} catch (error) {
-			console.error('Error generating message:', error);
+			console.error('Error in handleSubmit:', error);
 		} finally {
 			loading = false;
-			message.current = '';
 		}
 	}
 
@@ -438,9 +448,7 @@
 				'hidden md:flex': sidebarOpen,
 			})}
 		>
-			{#if page.params.id && currentConversationQuery.data}
-				<ShareButton conversationId={page.params.id as Id<'conversations'>} />
-			{/if}
+
 			<Tooltip>
 				{#snippet trigger(tooltip)}
 					<Button

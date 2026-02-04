@@ -7,6 +7,7 @@ interface StockAnalyzeRequest {
     message: string;
     session_token: string;
     conversation_id?: string;
+    skip_user_message?: boolean;
 }
 
 interface StockAnalyzeResponse {

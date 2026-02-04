@@ -18,6 +18,7 @@ const reqBodySchema = z.object({
     message: z.string(),
     session_token: z.string(),
     conversation_id: z.string().optional(),
+    skip_user_message: z.boolean().optional(),
 });
 
 const client = new ConvexHttpClient(PUBLIC_CONVEX_URL);
@@ -74,8 +75,8 @@ export const POST: RequestHandler = async ({ request }) => {
             title: args.message.slice(0, 50),
             session_token: sessionToken,
         });
-    } else {
-        // Add user message to existing conversation
+    } else if (!args.skip_user_message) {
+        // Add user message to existing conversation if not skipped
         await client.mutation(api.messages.create, {
             conversation_id: conversationId,
             content: args.message,
